@@ -1,0 +1,63 @@
+-- Crear la base de datos si no existe y usarla
+CREATE DATABASE IF NOT EXISTS two_drive;
+USE two_drive;
+
+-- Tabla de usuarios
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    totp_secret VARCHAR(255) DEFAULT NULL, -- Secreto TOTP (puede ser NULL)
+    is_2fa_enabled BOOLEAN DEFAULT FALSE, -- Indica si 2FA está habilitado
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tabla de códigos de recuperación
+CREATE TABLE IF NOT EXISTS recovery_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    code VARCHAR(10) NOT NULL UNIQUE,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tabla de archivos
+CREATE TABLE IF NOT EXISTS archivos (
+    id_archivo INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_original VARCHAR(255) NOT NULL,  -- Nombre real del archivo
+    nombre_guardado VARCHAR(255) NOT NULL,  -- Nombre con el que se almacena en el servidor
+    hash_sha256 VARCHAR(64) NOT NULL,  -- Hash SHA-256 del archivo
+    tipo_archivo VARCHAR(50) NOT NULL,  -- MIME type (ej. application/pdf)
+    tamanio BIGINT NOT NULL,  -- Tamaño en bytes
+    id_usuario INT NOT NULL,  -- Usuario que subió el archivo
+    fecha_subida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tabla de archivos compartidos
+CREATE TABLE IF NOT EXISTS archivos_compartidos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario_duenio INT NOT NULL,
+    id_usuario_invitado INT NOT NULL,
+    id_archivo INT NOT NULL,
+    tipo_permiso ENUM('lectura', 'descarga') NOT NULL,  -- Tipos de permisos
+    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_archivo) REFERENCES archivos(id_archivo) ON DELETE CASCADE,
+    FOREIGN KEY (id_usuario_duenio) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_usuario_invitado) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tabla de logs de actividad
+CREATE TABLE IF NOT EXISTS logs_actividad (
+    id_log INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    id_archivo INT NULL, -- Permite NULL para ON DELETE SET NULL
+    accion ENUM('subida', 'descarga', 'eliminacion') NOT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_usuario VARCHAR(45),  -- IP desde donde se accedió
+    FOREIGN KEY (id_usuario) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_archivo) REFERENCES archivos(id_archivo) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
